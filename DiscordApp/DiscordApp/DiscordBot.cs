@@ -9,66 +9,70 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.ComponentModel.Design;
 
-namespace DiscordApp
+namespace DiscordApp;
+
+public class DiscordBot
 {
-    public class DiscordBot
+    DiscordSocketClient _client; //봇 클라이언트
+    CommandService _commands;    //명령어 수신 클라이언트
+    private readonly string _token;
+    public DiscordBot(string token)
     {
-        private DiscordSocketClient _client;
-        private CommandService _commands;
-        private IServiceProvider _services;
-        private static string _token;
+        _token = token;
+    }
 
-        public DiscordBot(string token)
-        {            
-            _token = token;
-        }
+    /// <summary>
+    /// 봇의 진입점, 봇의 거의 모든 작업이 비동기로 작동되기 때문에 비동기 함수로 생성해야 함
+    /// </summary>
+    /// <returns></returns>
+    public async Task BotMain()
+    {
+        _client = new DiscordSocketClient(new DiscordSocketConfig()
+        {    //디스코드 봇 초기화
+            LogLevel = LogSeverity.Verbose                              //봇의 로그 레벨 설정 
+        });
 
-        /// <summary>
-        /// 프로그램 시작점
-        /// </summary>
-        /// <returns></returns>
-        public async Task RunBotAsync()
+        _commands = new CommandService(new CommandServiceConfig()        //명령어 수신 클라이언트 초기화
         {
-            _client = new DiscordSocketClient();
-            _commands = new CommandService();
+            LogLevel = LogSeverity.Verbose                              //봇의 로그 레벨 설정
+        });
 
-            _client.Log += Log;
+        //로그 수신 시 로그 출력 함수에서 출력되도록 설정
+        _client.Log += OnClientLogReceived;
+        _commands.Log += OnClientLogReceived;
 
-            await RegisterCommandsAsync();
+        await _client.LoginAsync(TokenType.Bot, _token); //봇의 토큰을 사용해 서버에 로그인
+        await _client.StartAsync();                         //봇이 이벤트를 수신하기 시작
 
-            await _client.LoginAsync(TokenType.Bot, _token);
+        _client.MessageReceived += MessageReceivedAsync;         //봇이 메시지를 수신할 때 처리하도록 설정
 
-            await _client.StartAsync();
+        await Task.Delay(-1);   //봇이 종료되지 않도록 블로킹
+    }
 
-            await Task.Delay(-1);
-        }
+    private async Task MessageReceivedAsync(SocketMessage arg)
+    {
+        //수신한 메시지가 사용자가 보낸 게 아닐 때 취소
+        var message = arg as SocketUserMessage;
+        if (message == null || message.Author.IsBot) return;
 
-        private Task Log(LogMessage arg)
-        {
-            Console.WriteLine(arg);
-            return Task.CompletedTask;
-        }
+        Console.WriteLine($"Received message: {arg.Content}"); // 수신된 메시지의 원문 출력
 
-        public async Task RegisterCommandsAsync()
-        {
-            _client.MessageReceived += HandleCommandAsync;
+        var context = new SocketCommandContext(_client, message);                    //수신된 메시지에 대한 컨텍스트 생성   
 
-            await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
-        }
+        await context.Channel.SendMessageAsync("명령어 수신됨 - " + message.Content); //수신된 명령어를 다시 보낸다.
+    }
 
-        private async Task HandleCommandAsync(SocketMessage arg)
-        {
-            var message = arg as SocketUserMessage;
-            var context = new SocketCommandContext(_client, message);
-            if (message.Author.IsBot) return;
 
-            int argPos = 0;
-            if (message.HasStringPrefix("!", ref argPos))
-            {
-                var result = await _commands.ExecuteAsync(context, argPos, _services);
-                if (!result.IsSuccess) Console.WriteLine(result.ErrorReason);
-            }
-        }
+    /// <summary>
+    /// 봇의 로그를 출력하는 함수
+    /// </summary>
+    /// <param name="msg">봇의 클라이언트에서 수신된 로그</param>
+    /// <returns></returns>
+    private Task OnClientLogReceived(LogMessage msg)
+    {
+        Console.WriteLine(msg.ToString());  //로그 출력
+        return Task.CompletedTask;
     }
 }
