@@ -21,6 +21,14 @@ public class DiscordBot
     public DiscordBot(string token)
     {
         _token = token;
+        var config = new DiscordSocketConfig
+        {
+            GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+        };
+
+        // It is recommended to Dispose of a client when you are finished
+        // using it, at the end of your app's lifetime.
+        _client = new DiscordSocketClient(config);       
     }
 
     /// <summary>
@@ -29,11 +37,6 @@ public class DiscordBot
     /// <returns></returns>
     public async Task BotMain()
     {
-        _client = new DiscordSocketClient(new DiscordSocketConfig()
-        {    //디스코드 봇 초기화
-            LogLevel = LogSeverity.Verbose                              //봇의 로그 레벨 설정 
-        });
-
         _commands = new CommandService(new CommandServiceConfig()        //명령어 수신 클라이언트 초기화
         {
             LogLevel = LogSeverity.Verbose                              //봇의 로그 레벨 설정
@@ -41,12 +44,14 @@ public class DiscordBot
 
         //로그 수신 시 로그 출력 함수에서 출력되도록 설정
         _client.Log += OnClientLogReceived;
+        _client.MessageReceived += MessageReceivedAsync;         //봇이 메시지를 수신할 때 처리하도록 설정
+        //_client.Ready += ReadyAsync;
+        //_client.InteractionCreated += InteractionCreatedAsync;
         _commands.Log += OnClientLogReceived;
 
         await _client.LoginAsync(TokenType.Bot, _token); //봇의 토큰을 사용해 서버에 로그인
         await _client.StartAsync();                         //봇이 이벤트를 수신하기 시작
 
-        _client.MessageReceived += MessageReceivedAsync;         //봇이 메시지를 수신할 때 처리하도록 설정
 
         await Task.Delay(-1);   //봇이 종료되지 않도록 블로킹
     }
