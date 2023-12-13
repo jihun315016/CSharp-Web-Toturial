@@ -32,19 +32,21 @@ public class DiscordBot
     }
 
     /// <summary>
-    /// 봇의 진입점, 봇의 거의 모든 작업이 비동기로 작동되기 때문에 비동기 함수로 생성해야 함
+    /// 시작점
+    /// 대부분 작업이 비동기로 동작하기 때문에, 비동기 메서드로 작성한다.
     /// </summary>
     /// <returns></returns>
     public async Task BotMain()
     {
-        _commands = new CommandService(new CommandServiceConfig()        //명령어 수신 클라이언트 초기화
+        CommandServiceConfig commandServiceConfig = new CommandServiceConfig()
         {
-            LogLevel = LogSeverity.Verbose                              //봇의 로그 레벨 설정
-        });
+            LogLevel = LogSeverity.Verbose // 봇 로그 레벨 설정
+        };
+        _commands = new CommandService(commandServiceConfig);
 
         //로그 수신 시 로그 출력 함수에서 출력되도록 설정
         _client.Log += OnClientLogReceived;
-        _client.MessageReceived += MessageReceivedAsync;         //봇이 메시지를 수신할 때 처리하도록 설정
+        _client.MessageReceived += OnMessageReceivedAsync;         //봇이 메시지를 수신할 때 처리하도록 설정
         //_client.Ready += ReadyAsync;
         //_client.InteractionCreated += InteractionCreatedAsync;
         _commands.Log += OnClientLogReceived;
@@ -56,22 +58,19 @@ public class DiscordBot
         await Task.Delay(-1);   //봇이 종료되지 않도록 블로킹
     }
 
-    private async Task MessageReceivedAsync(SocketMessage arg)
+    private async Task OnMessageReceivedAsync(SocketMessage arg)
     {
         //수신한 메시지가 사용자가 보낸 게 아닐 때 취소
         var message = arg as SocketUserMessage;
         if (message == null || message.Author.IsBot) return;
 
-        Console.WriteLine($"Received message: {arg.Content}"); // 수신된 메시지의 원문 출력
-
         var context = new SocketCommandContext(_client, message);                    //수신된 메시지에 대한 컨텍스트 생성   
-
         await context.Channel.SendMessageAsync("명령어 수신됨 - " + message.Content); //수신된 명령어를 다시 보낸다.
     }
 
 
     /// <summary>
-    /// 봇의 로그를 출력하는 함수
+    /// 봇 로그 출력
     /// </summary>
     /// <param name="msg">봇의 클라이언트에서 수신된 로그</param>
     /// <returns></returns>
